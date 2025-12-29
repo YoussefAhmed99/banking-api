@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Banking Transaction API
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: nodejs24.x
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        ACCOUNTS_TABLE: !Ref AccountsTable
+        TRANSACTIONS_TABLE: !Ref TransactionsTable
+
+Resources:
+  # DynamoDB Tables
+  AccountsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: accounts
+      PrimaryKey:
+        Name: accountId
+        Type: String
+
+  TransactionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: transactions
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: accountId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema:
+        - AttributeName: accountId
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+  
+  # Lambda Functions
+  CreateAccountFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/create-account/
+      Handler: app.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsTable
+      Events:
+        CreateAccount:
+          Type: Api
+          Properties:
+            Path: /accounts
+            Method: post
+
+  GetAccountFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/get-account/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref AccountsTable
+      Events:
+        GetAccount:
+          Type: Api
+          Properties:
+            Path: /accounts/{accountId}
+            Method: get
+
+  DepositFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/deposit/
+      Handler: app.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TransactionsTable
+      Events:
+        Deposit:
+          Type: Api
+          Properties:
+            Path: /accounts/{accountId}/deposit
+            Method: post
+
+  WithdrawFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/withdraw/
+      Handler: app.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TransactionsTable
+      Events:
+        Withdraw:
+          Type: Api
+          Properties:
+            Path: /accounts/{accountId}/withdraw
+            Method: post
+
+  GetTransactionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/get-transactions/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TransactionsTable
+      Events:
+        GetTransactions:
+          Type: Api
+          Properties:
+            Path: /accounts/{accountId}/transactions
+            Method: get
+
+Outputs:
+  BankingApi:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  
+  AccountsTableName:
+    Description: Accounts DynamoDB table
+    Value: !Ref AccountsTable
+  
+  TransactionsTableName:
+    Description: Transactions DynamoDB table
+    Value: !Ref TransactionsTable
