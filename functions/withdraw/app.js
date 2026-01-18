@@ -1,34 +1,33 @@
-import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand } from '@aws-sdk/lib-dynamodb'
 import { docClient } from '/opt/nodejs/shared/db/client.js'
-import { NotFoundError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
+import { ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
 import { validateAmount } from '/opt/nodejs/shared/utils/validators.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
 import { logger } from '/opt/nodejs/shared/logger/index.js'
+import { verifyAccessToken, checkAccountOwnership } from '/opt/nodejs/shared/auth/auth.js'
 
 export const handler = async event => {
   try {
+    const decoded = verifyAccessToken(event)
+    const { userId } = decoded
+
     const body = JSON.parse(event.body)
-    const { accountId } = event.pathParameters
+    const accountId = event.pathParameters?.accountId
     const { amount } = body
+
+    if (!accountId) {
+      throw new ValidationError('Account ID is required')
+    }
 
     validateAmount(amount)
 
-    logger.info('Processing withdrawal', { accountId, amount })
+    logger.info('Processing withdrawal', { accountId, amount, userId })
 
-    // Fetch the account
-    const result = await docClient.send(
-      new GetCommand({
-        TableName: process.env.ACCOUNTS_TABLE,
-        Key: { accountId }
-      })
-    )
-
-    if (!result.Item) {
-      throw new NotFoundError('Account not found')
-    }
+    // Verify ownership and get account
+    const account = await checkAccountOwnership(accountId, userId, docClient)
 
     // Update the balance
-    const newBalance = result.Item.balance - amount
+    const newBalance = account.balance - amount
 
     if (newBalance < 0) {
       throw new ValidationError('Insufficient funds')
@@ -38,7 +37,7 @@ export const handler = async event => {
       new PutCommand({
         TableName: process.env.ACCOUNTS_TABLE,
         Item: {
-          ...result.Item,
+          ...account,
           balance: newBalance
         }
       })

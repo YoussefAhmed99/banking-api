@@ -4,9 +4,14 @@ import { ConflictError, ValidationError } from '/opt/nodejs/shared/errors/AppErr
 import { validateAccountId, validateAmount } from '/opt/nodejs/shared/utils/validators.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
 import { logger } from '/opt/nodejs/shared/logger/index.js'
+import { verifyAccessToken } from '/opt/nodejs/shared/auth/auth.js'
 
 export const handler = async event => {
   try {
+    // Verify JWT and extract userId
+    const decoded = verifyAccessToken(event)
+    const { userId } = decoded
+
     const body = JSON.parse(event.body)
     const { accountId, customerName, initialBalance } = body
 
@@ -19,7 +24,7 @@ export const handler = async event => {
 
     validateAmount(initialBalance, { allowZero: true, fieldName: 'Initial balance' })
 
-    logger.info('Creating account', { accountId, customerName, initialBalance })
+    logger.info('Creating account', { accountId, customerName, initialBalance, userId })
 
     // Check if account already exists
     const existing = await docClient.send(
@@ -35,6 +40,7 @@ export const handler = async event => {
 
     const account = {
       accountId,
+      userId,
       customerName,
       balance: initialBalance,
       createdAt: new Date().toISOString()

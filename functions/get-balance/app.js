@@ -1,4 +1,3 @@
-import { QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { docClient } from '/opt/nodejs/shared/db/client.js'
 import { ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
@@ -15,26 +14,15 @@ export const handler = async event => {
       throw new ValidationError('Account ID is required')
     }
 
-    logger.info('Getting transactions', { accountId, userId })
+    logger.info('Getting balance', { accountId, userId })
 
-    // Verify ownership
-    await checkAccountOwnership(accountId, userId, docClient)
+    // Verify ownership and get account
+    const account = await checkAccountOwnership(accountId, userId, docClient)
 
-    const result = await docClient.send(
-      new QueryCommand({
-        TableName: process.env.TRANSACTIONS_TABLE,
-        KeyConditionExpression: 'accountId = :accountId',
-        ExpressionAttributeValues: {
-          ':accountId': accountId
-        },
-        ScanIndexForward: false  // Sort by timestamp DESC (newest first)
-      })
-    )
-
-    logger.info('Transactions retrieved successfully', { accountId, count: result.Count })
+    logger.info('Balance retrieved', { accountId, balance: account.balance })
     return success({
-      transactions: result.Items || [],
-      count: result.Count
+      accountId: account.accountId,
+      balance: account.balance
     })
   } catch (err) {
     if (err.isOperational) {
@@ -42,7 +30,7 @@ export const handler = async event => {
       return error(err.message, err.statusCode)
     }
 
-    logger.error('Unexpected error getting transactions', err, { accountId: event.pathParameters?.accountId })
+    logger.error('Unexpected error getting balance', err)
     return error('Internal server error', 500)
   }
 }

@@ -2,6 +2,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Banking Transaction API
 
+Parameters:
+  JwtSecret:
+    Type: String
+    Default: "change-this-in-production"
+    Description: Secret key for JWT signing
+
 Globals:
   Function:
     Timeout: 10
@@ -12,6 +18,9 @@ Globals:
       Variables:
         ACCOUNTS_TABLE: !Ref AccountsTable
         TRANSACTIONS_TABLE: !Ref TransactionsTable
+        USERS_TABLE: !Ref UsersTable
+        REFRESH_TOKENS_TABLE: !Ref RefreshTokensTable
+        JWT_SECRET: !Ref JwtSecret
         AWS_SAM_LOCAL: "true"
     Layers:
       - !Ref SharedUtilitiesLayer
@@ -19,12 +28,25 @@ Globals:
 Resources:
   # DynamoDB Tables
   AccountsTable:
-    Type: AWS::Serverless::SimpleTable
+    Type: AWS::DynamoDB::Table
     Properties:
       TableName: accounts
-      PrimaryKey:
-        Name: accountId
-        Type: String
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: accountId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: accountId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: userId-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   TransactionsTable:
     Type: AWS::DynamoDB::Table
@@ -41,8 +63,140 @@ Resources:
           KeyType: HASH
         - AttributeName: timestamp
           KeyType: RANGE
-  
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: email-index
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  RefreshTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: refresh-tokens
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
   # Lambda Functions
+
+  # Auth Functions
+  RegisterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/register/
+      Handler: app.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        Register:
+          Type: Api
+          Properties:
+            Path: /register
+            Method: post
+
+  LoginFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/login/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RefreshTokensTable
+      Events:
+        Login:
+          Type: Api
+          Properties:
+            Path: /login
+            Method: post
+
+  RefreshFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/refresh/
+      Handler: app.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RefreshTokensTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        Refresh:
+          Type: Api
+          Properties:
+            Path: /refresh
+            Method: post
+
+  LogoutFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/logout/
+      Handler: app.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RefreshTokensTable
+      Events:
+        Logout:
+          Type: Api
+          Properties:
+            Path: /logout
+            Method: post
+
+  ListAccountsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/list-accounts/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref AccountsTable
+      Events:
+        ListAccounts:
+          Type: Api
+          Properties:
+            Path: /accounts
+            Method: get
+
+  GetBalanceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/get-balance/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref AccountsTable
+      Events:
+        GetBalance:
+          Type: Api
+          Properties:
+            Path: /accounts/{accountId}/balance
+            Method: get
+
   CreateAccountFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -123,7 +277,24 @@ Resources:
           Properties:
             Path: /accounts/{accountId}/transactions
             Method: get
-  
+
+  TransferFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/transfer/
+      Handler: app.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TransactionsTable
+      Events:
+        Transfer:
+          Type: Api
+          Properties:
+            Path: /accounts/{accountId}/transfer
+            Method: post
+
   SharedUtilitiesLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
