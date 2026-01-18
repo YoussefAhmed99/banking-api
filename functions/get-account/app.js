@@ -1,40 +1,33 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb'
-
-const client = new DynamoDBClient({
-  ...(process.env.AWS_SAM_LOCAL === 'true' && {
-    endpoint: 'http://172.18.0.2:8000'
-  })
-})
-const docClient = DynamoDBDocumentClient.from(client)
+import { docClient } from '/opt/nodejs/shared/db/client.js'
+import { ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
+import { success, error } from '/opt/nodejs/shared/utils/responses.js'
+import { logger } from '/opt/nodejs/shared/logger/index.js'
+import { verifyAccessToken, checkAccountOwnership } from '/opt/nodejs/shared/auth/auth.js'
 
 export const handler = async event => {
   try {
-    const { accountId } = event.pathParameters
+    const decoded = verifyAccessToken(event)
+    const { userId } = decoded
+    const accountId = event.pathParameters?.accountId
 
-    const result = await docClient.send(
-      new GetCommand({
-        TableName: process.env.ACCOUNTS_TABLE,
-        Key: { accountId }
-      })
-    )
-
-    if (!result.Item) {
-      return {
-        statusCode: 404,
-        body: JSON.stringify({ message: 'Account not found' })
-      }
+    if (!accountId) {
+      throw new ValidationError('Account ID is required')
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify(result.Item)
+    logger.info('Getting account', { accountId, userId })
+
+    // Verify ownership and get account
+    const account = await checkAccountOwnership(accountId, userId, docClient)
+
+    logger.info('Account retrieved successfully', { accountId })
+    return success(account)
+  } catch (err) {
+    if (err.isOperational) {
+      logger.info('Operational error', { error: err.message })
+      return error(err.message, err.statusCode)
     }
-  } catch (error) {
-    console.error('Error getting account:', error)
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal server error' })
-    }
+
+    logger.error('Unexpected error getting account', err, { accountId: event.pathParameters?.accountId })
+    return error('Internal server error', 500)
   }
 }

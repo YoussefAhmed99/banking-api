@@ -1,59 +1,44 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import {
-  DynamoDBDocumentClient,
-  PutCommand,
-  GetCommand
-} from '@aws-sdk/lib-dynamodb'
-
-const client = new DynamoDBClient({
-  ...(process.env.AWS_SAM_LOCAL === 'true' && {
-    endpoint: 'http://172.18.0.2:8000'
-  })
-})
-const docClient = DynamoDBDocumentClient.from(client)
+import { PutCommand } from '@aws-sdk/lib-dynamodb'
+import { docClient } from '/opt/nodejs/shared/db/client.js'
+import { ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
+import { validateAmount } from '/opt/nodejs/shared/utils/validators.js'
+import { success, error } from '/opt/nodejs/shared/utils/responses.js'
+import { logger } from '/opt/nodejs/shared/logger/index.js'
+import { verifyAccessToken, checkAccountOwnership } from '/opt/nodejs/shared/auth/auth.js'
 
 export const handler = async event => {
   try {
+    const decoded = verifyAccessToken(event)
+    const { userId } = decoded
+
     const body = JSON.parse(event.body)
-    const { accountId } = event.pathParameters
+    const accountId = event.pathParameters?.accountId
     const { amount } = body
 
-    if (amount == null || amount <= 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ message: 'Invalid amount' })
-      }
+    if (!accountId) {
+      throw new ValidationError('Account ID is required')
     }
 
-    // Fetch the account
-    const result = await docClient.send(
-      new GetCommand({
-        TableName: process.env.ACCOUNTS_TABLE,
-        Key: { accountId }
-      })
-    )
+    validateAmount(amount)
 
-    if (!result.Item) {
-      return {
-        statusCode: 404,
-        body: JSON.stringify({ message: 'Account not found' })
-      }
-    }
+    logger.info('Processing deposit', { accountId, amount, userId })
+
+    // Verify ownership and get account
+    const account = await checkAccountOwnership(accountId, userId, docClient)
 
     // Update the balance
-    const newBalance = result.Item.balance + amount
+    const newBalance = account.balance + amount
 
     await docClient.send(
       new PutCommand({
         TableName: process.env.ACCOUNTS_TABLE,
         Item: {
-          ...result.Item,
+          ...account,
           balance: newBalance
         }
       })
     )
 
-    // After updating account, before return:
     await docClient.send(
       new PutCommand({
         TableName: process.env.TRANSACTIONS_TABLE,
@@ -67,15 +52,15 @@ export const handler = async event => {
       })
     )
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: 'Deposit successful', newBalance })
+    logger.info('Deposit successful', { accountId, amount, newBalance })
+    return success({ message: 'Deposit successful', newBalance })
+  } catch (err) {
+    if (err.isOperational) {
+      logger.info('Operational error', { error: err.message })
+      return error(err.message, err.statusCode)
     }
-  } catch (error) {
-    console.error('Error processing deposit:', error)
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal server error' })
-    }
+
+    logger.error('Unexpected error processing deposit', err, { accountId: event.pathParameters?.accountId })
+    return error('Internal server error', 500)
   }
 }
