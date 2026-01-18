@@ -1,16 +1,13 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb'
-
-const client = new DynamoDBClient({
-  ...(process.env.AWS_SAM_LOCAL === 'true' && {
-    endpoint: 'http://172.18.0.2:8000'
-  })
-})
-const docClient = DynamoDBDocumentClient.from(client)
+import { QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { docClient } from '/opt/nodejs/shared/db/client.js'
+import { success, error } from '/opt/nodejs/shared/utils/responses.js'
+import { logger } from '/opt/nodejs/shared/logger/index.js'
 
 export const handler = async event => {
   try {
     const { accountId } = event.pathParameters
+
+    logger.info('Getting transactions', { accountId })
 
     const result = await docClient.send(
       new QueryCommand({
@@ -23,18 +20,18 @@ export const handler = async event => {
       })
     )
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        transactions: result.Items || [],
-        count: result.Count
-      })
+    logger.info('Transactions retrieved successfully', { accountId, count: result.Count })
+    return success({
+      transactions: result.Items || [],
+      count: result.Count
+    })
+  } catch (err) {
+    if (err.isOperational) {
+      logger.info('Operational error', { error: err.message })
+      return error(err.message, err.statusCode)
     }
-  } catch (error) {
-    console.error('Error getting transactions:', error)
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal server error' })
-    }
+
+    logger.error('Unexpected error getting transactions', err, { accountId: event.pathParameters?.accountId })
+    return error('Internal server error', 500)
   }
 }

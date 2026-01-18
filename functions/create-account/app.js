@@ -1,35 +1,25 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import {
-  DynamoDBDocumentClient,
-  PutCommand,
-  GetCommand
-} from '@aws-sdk/lib-dynamodb'
-
-const client = new DynamoDBClient({
-  ...(process.env.AWS_SAM_LOCAL === 'true' && {
-    endpoint: 'http://172.18.0.2:8000'
-  })
-})
-const docClient = DynamoDBDocumentClient.from(client)
+import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { docClient } from '/opt/nodejs/shared/db/client.js'
+import { ConflictError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
+import { validateAccountId, validateAmount } from '/opt/nodejs/shared/utils/validators.js'
+import { success, error } from '/opt/nodejs/shared/utils/responses.js'
+import { logger } from '/opt/nodejs/shared/logger/index.js'
 
 export const handler = async event => {
   try {
     const body = JSON.parse(event.body)
     const { accountId, customerName, initialBalance } = body
 
-    if (!accountId || !customerName || initialBalance == null) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ message: 'Missing required fields' })
-      }
+    // Validate inputs
+    validateAccountId(accountId)
+
+    if (!customerName || typeof customerName !== 'string' || customerName.trim() === '') {
+      throw new ValidationError('Customer name is required')
     }
 
-    if (initialBalance < 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ message: 'Initial balance cannot be negative' })
-      }
-    }
+    validateAmount(initialBalance, { allowZero: true, fieldName: 'Initial balance' })
+
+    logger.info('Creating account', { accountId, customerName, initialBalance })
 
     // Check if account already exists
     const existing = await docClient.send(
@@ -40,10 +30,7 @@ export const handler = async event => {
     )
 
     if (existing.Item) {
-      return {
-        statusCode: 409,
-        body: JSON.stringify({ message: 'Account already exists' })
-      }
+      throw new ConflictError('Account already exists')
     }
 
     const account = {
@@ -75,15 +62,15 @@ export const handler = async event => {
       )
     }
 
-    return {
-      statusCode: 201,
-      body: JSON.stringify({ message: 'Account created successfully', account })
+    logger.info('Account created successfully', { accountId })
+    return success({ message: 'Account created successfully', account }, 201)
+  } catch (err) {
+    if (err.isOperational) {
+      logger.info('Operational error', { error: err.message })
+      return error(err.message, err.statusCode)
     }
-  } catch (error) {
-    console.error('Error creating account:', error)
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal Server Error' })
-    }
+
+    logger.error('Unexpected error creating account', err)
+    return error('Internal server error', 500)
   }
 }

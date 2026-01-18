@@ -1,16 +1,9 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import {
-  DynamoDBDocumentClient,
-  PutCommand,
-  GetCommand
-} from '@aws-sdk/lib-dynamodb'
-
-const client = new DynamoDBClient({
-  ...(process.env.AWS_SAM_LOCAL === 'true' && {
-    endpoint: 'http://172.18.0.2:8000'
-  })
-})
-const docClient = DynamoDBDocumentClient.from(client)
+import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { docClient } from '/opt/nodejs/shared/db/client.js'
+import { NotFoundError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
+import { validateAmount } from '/opt/nodejs/shared/utils/validators.js'
+import { success, error } from '/opt/nodejs/shared/utils/responses.js'
+import { logger } from '/opt/nodejs/shared/logger/index.js'
 
 export const handler = async event => {
   try {
@@ -18,12 +11,9 @@ export const handler = async event => {
     const { accountId } = event.pathParameters
     const { amount } = body
 
-    if (amount == null || amount <= 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ message: 'Invalid amount' })
-      }
-    }
+    validateAmount(amount)
+
+    logger.info('Processing withdrawal', { accountId, amount })
 
     // Fetch the account
     const result = await docClient.send(
@@ -34,20 +24,14 @@ export const handler = async event => {
     )
 
     if (!result.Item) {
-      return {
-        statusCode: 404,
-        body: JSON.stringify({ message: 'Account not found' })
-      }
+      throw new NotFoundError('Account not found')
     }
 
     // Update the balance
     const newBalance = result.Item.balance - amount
 
-    if(newBalance < 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ message: 'Insufficient funds' })
-      }
+    if (newBalance < 0) {
+      throw new ValidationError('Insufficient funds')
     }
 
     await docClient.send(
@@ -60,29 +44,28 @@ export const handler = async event => {
       })
     )
 
-    // After updating account, before return:
     await docClient.send(
       new PutCommand({
         TableName: process.env.TRANSACTIONS_TABLE,
         Item: {
           accountId,
           timestamp: Date.now(),
-          amount: amount*-1,
+          amount: amount * -1,
           type: 'withdrawal',
           newBalance
         }
       })
     )
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: 'withdrawal successful', newBalance })
+    logger.info('Withdrawal successful', { accountId, amount, newBalance })
+    return success({ message: 'Withdrawal successful', newBalance })
+  } catch (err) {
+    if (err.isOperational) {
+      logger.info('Operational error', { error: err.message })
+      return error(err.message, err.statusCode)
     }
-  } catch (error) {
-    console.error('Error processing withdrawal:', error)
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal server error' })
-    }
+
+    logger.error('Unexpected error processing withdrawal', err, { accountId: event.pathParameters?.accountId })
+    return error('Internal server error', 500)
   }
 }

@@ -12,6 +12,9 @@ Globals:
       Variables:
         ACCOUNTS_TABLE: !Ref AccountsTable
         TRANSACTIONS_TABLE: !Ref TransactionsTable
+        AWS_SAM_LOCAL: "true"
+    Layers:
+      - !Ref SharedUtilitiesLayer
 
 Resources:
   # DynamoDB Tables
@@ -120,6 +123,18 @@ Resources:
           Properties:
             Path: /accounts/{accountId}/transactions
             Method: get
+  
+  SharedUtilitiesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: banking-api-shared
+      Description: Shared utilities for banking API
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - nodejs24.x
+    Metadata:
+      BuildMethod: nodejs24.x
+
 
 Outputs:
   BankingApi:
