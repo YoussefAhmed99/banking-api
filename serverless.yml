@@ -1,0 +1,228 @@
+service: banking-api
+
+plugins:
+  - serverless-offline
+
+build:
+  esbuild:
+    bundle: true
+    minify: false
+    exclude:
+      - '@aws-sdk/client-dynamodb'
+      - '@aws-sdk/lib-dynamodb'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: eu-north-1
+  stage: ${opt:stage, 'dev'}
+  
+  environment:
+    ACCOUNTS_TABLE: ${self:service}-accounts-${self:provider.stage}
+    TRANSACTIONS_TABLE: ${self:service}-transactions-${self:provider.stage}
+    USERS_TABLE: ${self:service}-users-${self:provider.stage}
+    REFRESH_TOKENS_TABLE: ${self:service}-refresh-tokens-${self:provider.stage}
+    JWT_SECRET: ${env:JWT_SECRET, 'dev-jwt-secret-change-for-production-12345'}
+    IS_OFFLINE: ${env:IS_OFFLINE, 'false'}
+  
+  layers:
+    - { Ref: SharedLambdaLayer }
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.ACCOUNTS_TABLE}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.ACCOUNTS_TABLE}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TRANSACTIONS_TABLE}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.REFRESH_TOKENS_TABLE}
+
+functions:
+  register:
+    handler: functions/register/app.handler
+    events:
+      - http:
+          path: register
+          method: post
+          cors: true
+  
+  login:
+    handler: functions/login/app.handler
+    events:
+      - http:
+          path: login
+          method: post
+          cors: true
+  
+  refresh:
+    handler: functions/refresh/app.handler
+    events:
+      - http:
+          path: refresh
+          method: post
+          cors: true
+  
+  logout:
+    handler: functions/logout/app.handler
+    events:
+      - http:
+          path: logout
+          method: post
+          cors: true
+  
+  listAccounts:
+    handler: functions/list-accounts/app.handler
+    events:
+      - http:
+          path: accounts
+          method: get
+          cors: true
+  
+  createAccount:
+    handler: functions/create-account/app.handler
+    events:
+      - http:
+          path: accounts
+          method: post
+          cors: true
+  
+  getAccount:
+    handler: functions/get-account/app.handler
+    events:
+      - http:
+          path: accounts/{accountId}
+          method: get
+          cors: true
+  
+  getBalance:
+    handler: functions/get-balance/app.handler
+    events:
+      - http:
+          path: accounts/{accountId}/balance
+          method: get
+          cors: true
+  
+  deposit:
+    handler: functions/deposit/app.handler
+    events:
+      - http:
+          path: accounts/{accountId}/deposit
+          method: post
+          cors: true
+  
+  withdraw:
+    handler: functions/withdraw/app.handler
+    events:
+      - http:
+          path: accounts/{accountId}/withdraw
+          method: post
+          cors: true
+  
+  transfer:
+    handler: functions/transfer/app.handler
+    events:
+      - http:
+          path: accounts/{accountId}/transfer
+          method: post
+          cors: true
+  
+  getTransactions:
+    handler: functions/get-transactions/app.handler
+    events:
+      - http:
+          path: accounts/{accountId}/transactions
+          method: get
+          cors: true
+
+layers:
+  shared:
+    path: layer
+    name: ${self:service}-shared-${self:provider.stage}
+    description: Shared utilities for banking API
+    compatibleRuntimes:
+      - nodejs20.x
+
+resources:
+  Resources:
+    AccountsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.ACCOUNTS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: accountId
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: accountId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: userId-index
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+    
+    TransactionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TRANSACTIONS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: accountId
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: N
+        KeySchema:
+          - AttributeName: accountId
+            KeyType: HASH
+          - AttributeName: timestamp
+            KeyType: RANGE
+    
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.USERS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: email-index
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+    
+    RefreshTokensTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.REFRESH_TOKENS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: token
+            AttributeType: S
+        KeySchema:
+          - AttributeName: token
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true

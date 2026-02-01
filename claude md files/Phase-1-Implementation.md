@@ -59,7 +59,7 @@ export const docClient = DynamoDBDocumentClient.from(client)
 
 **Usage:**
 ```javascript
-import { docClient } from '/opt/nodejs/shared/db/client.js'
+import { docClient } from '../../shared/db/client.js'
 ```
 
 ---
@@ -85,7 +85,7 @@ import { docClient } from '/opt/nodejs/shared/db/client.js'
 
 **Usage:**
 ```javascript
-import { ValidationError, NotFoundError } from '/opt/nodejs/shared/errors/AppError.js'
+import { ValidationError, NotFoundError } from '../../shared/errors/AppError.js'
 
 // Throwing errors
 throw new ValidationError('Email is required')
@@ -143,7 +143,7 @@ export const logger = {
 
 **Usage:**
 ```javascript
-import { logger } from '/opt/nodejs/shared/logger/index.js'
+import { logger } from '../../shared/logger/index.js'
 
 logger.info('Creating account', { accountId, customerName })
 logger.error('Unexpected error', err, { accountId })
@@ -173,7 +173,7 @@ export function error(message, statusCode = 500) {
 
 **Usage:**
 ```javascript
-import { success, error } from '/opt/nodejs/shared/utils/responses.js'
+import { success, error } from '../../shared/utils/responses.js'
 
 // Success responses
 return success({ message: 'Account created', account }, 201)
@@ -208,7 +208,7 @@ validateAmount(amount, {
 
 **Usage:**
 ```javascript
-import { validateEmail, validateAmount, validateAccountId } from '/opt/nodejs/shared/utils/validators.js'
+import { validateEmail, validateAmount, validateAccountId } from '../../shared/utils/validators.js'
 
 validateAccountId(accountId)  // throws ValidationError if invalid
 validateAmount(initialBalance, { allowZero: true, fieldName: 'Initial balance' })
@@ -264,11 +264,11 @@ const docClient = DynamoDBDocumentClient.from(client)
 
 ### After (Shared Utilities)
 ```javascript
-import { docClient } from '/opt/nodejs/shared/db/client.js'
-import { ValidationError, ConflictError } from '/opt/nodejs/shared/errors/AppError.js'
-import { validateAccountId, validateAmount } from '/opt/nodejs/shared/utils/validators.js'
-import { success, error } from '/opt/nodejs/shared/utils/responses.js'
-import { logger } from '/opt/nodejs/shared/logger/index.js'
+import { docClient } from '../../shared/db/client.js'
+import { ValidationError, ConflictError } from '../../shared/errors/AppError.js'
+import { validateAccountId, validateAmount } from '../../shared/utils/validators.js'
+import { success, error } from '../../shared/utils/responses.js'
+import { logger } from '../../shared/logger/index.js'
 
 export const handler = async (event) => {
     try {
@@ -329,7 +329,7 @@ export const handler = async (event) => {
 Lambda Layers are mounted at `/opt/nodejs/` at runtime. All imports use this path:
 
 ```javascript
-import { docClient } from '/opt/nodejs/shared/db/client.js'
+import { docClient } from '../../shared/db/client.js'
 ```
 
 This path works in AWS Lambda but **not in local Node.js** without SAM Local. Always test with `sam local start-api`.

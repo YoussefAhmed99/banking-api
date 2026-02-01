@@ -1,9 +1,9 @@
 import { GetCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
-import { docClient } from '/opt/nodejs/shared/db/client.js'
-import { UnauthorizedError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
-import { success, error } from '/opt/nodejs/shared/utils/responses.js'
-import { logger } from '/opt/nodejs/shared/logger/index.js'
-import { verifyToken, generateAccessToken } from '/opt/nodejs/shared/auth/jwt.js'
+import { docClient } from '../../shared/db/client.js'
+import { UnauthorizedError, ValidationError } from '../../shared/errors/AppError.js'
+import { success, error } from '../../shared/utils/responses.js'
+import { logger } from '../../shared/logger/index.js'
+import { verifyToken, generateAccessToken } from '../../shared/auth/jwt.js'
 
 export const handler = async event => {
   try {
