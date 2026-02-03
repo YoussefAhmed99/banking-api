@@ -6,7 +6,7 @@ A secure serverless REST API for managing bank accounts and transactions with JW
 
 This project demonstrates serverless architecture, banking logic, and security best practices using AWS services. Features user authentication, account ownership verification, deposits, withdrawals, transfers, and complete transaction audit trail.
 
-**Live API:** `https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/`
+**Live API:** `https://o7jgcnqqnl.execute-api.eu-north-1.amazonaws.com/dev`
 
 ---
 
@@ -34,13 +34,96 @@ This project demonstrates serverless architecture, banking logic, and security b
 
 ## Tech Stack
 
-- **AWS Lambda** - Serverless compute (Node.js 24.x)
+- **AWS Lambda** - Serverless compute (Node.js 20.x)
 - **Amazon DynamoDB** - NoSQL database with GSIs
 - **API Gateway** - HTTP API endpoints
-- **AWS SAM** - Infrastructure as Code
+- **Serverless Framework v4** - Infrastructure as Code
+- **Lambda Layers** - Shared utilities and dependencies
 - **JWT** - Token-based authentication
 - **bcrypt** - Password hashing
-- **Docker** - Local development (DynamoDB Local)
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      API Gateway                             │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+    ┌─────────────────────┼─────────────────────┐
+    │                     │                     │
+    ▼                     ▼                     ▼
+┌────────┐          ┌────────┐           ┌────────┐
+│register│          │ login  │           │accounts│  ... 12 functions
+└───┬────┘          └───┬────┘           └───┬────┘
+    │                   │                    │
+    └───────────────────┼────────────────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │    Lambda Layer       │
+            │  ┌─────────────────┐  │
+            │  │ shared/         │  │
+            │  │  ├── auth/      │  │
+            │  │  ├── db/        │  │
+            │  │  ├── errors/    │  │
+            │  │  ├── logger/    │  │
+            │  │  └── utils/     │  │
+            │  ├─────────────────┤  │
+            │  │ node_modules/   │  │
+            │  │  ├── bcryptjs   │  │
+            │  │  ├── jsonwebtoken│ │
+            │  │  └── @aws-sdk   │  │
+            │  └─────────────────┘  │
+            └───────────┬───────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │      DynamoDB         │
+            │  ┌─────┐ ┌─────────┐  │
+            │  │Users│ │Accounts │  │
+            │  └─────┘ └─────────┘  │
+            │  ┌─────┐ ┌─────────┐  │
+            │  │Trans│ │ Tokens  │  │
+            │  └─────┘ └─────────┘  │
+            └───────────────────────┘
+```
+
+---
+
+## Project Structure
+
+```
+banking-api/
+├── functions/                 # Lambda handlers (~1-2KB each)
+│   ├── register/
+│   │   └── app.js
+│   ├── login/
+│   ├── refresh/
+│   ├── logout/
+│   ├── list-accounts/
+│   ├── create-account/
+│   ├── get-account/
+│   ├── get-balance/
+│   ├── deposit/
+│   ├── withdraw/
+│   ├── transfer/
+│   └── get-transactions/
+├── layer/                     # Lambda Layer (~231KB)
+│   └── nodejs/
+│       ├── package.json
+│       ├── node_modules/
+│       └── shared/
+│           ├── auth/          # JWT, password hashing
+│           ├── db/            # DynamoDB client
+│           ├── errors/        # Custom error classes
+│           ├── logger/        # Structured logging
+│           └── utils/         # Responses, validators
+├── serverless.yml             # Infrastructure definition
+├── test-api.mjs               # Integration tests (26 tests)
+└── README.md
+```
 
 ---
 
@@ -96,7 +179,7 @@ GET    /accounts/{id}/transactions            Get transaction history (owner onl
 
 ### 1. Register a User
 ```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/register \
+curl -X POST https://o7jgcnqqnl.execute-api.eu-north-1.amazonaws.com/dev/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -106,7 +189,7 @@ curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/regist
 
 ### 2. Login
 ```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/login \
+curl -X POST https://o7jgcnqqnl.execute-api.eu-north-1.amazonaws.com/dev/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -125,7 +208,7 @@ curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/login 
 
 ### 3. Create Account
 ```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts \
+curl -X POST https://o7jgcnqqnl.execute-api.eu-north-1.amazonaws.com/dev/accounts \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{
@@ -137,7 +220,7 @@ curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accoun
 
 ### 4. Deposit Funds
 ```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts/ACC001/deposit \
+curl -X POST https://o7jgcnqqnl.execute-api.eu-north-1.amazonaws.com/dev/accounts/ACC001/deposit \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{"amount": 500}'
@@ -145,7 +228,7 @@ curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accoun
 
 ### 5. Transfer Funds
 ```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts/ACC001/transfer \
+curl -X POST https://o7jgcnqqnl.execute-api.eu-north-1.amazonaws.com/dev/accounts/ACC001/transfer \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{
@@ -156,60 +239,80 @@ curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accoun
 
 ### 6. Get Transactions
 ```bash
-curl https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts/ACC001/transactions \
+curl https://o7jgcnqqnl.execute-api.eu-north-1.amazonaws.com/dev/accounts/ACC001/transactions \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
 ---
 
-## Authentication Flow
+## Development Workflow
 
+This project follows corporate-standard serverless development practices: **deploy to AWS for testing** rather than local emulation.
+
+### Why Not Local Emulation?
+
+Tools like `serverless-offline` and LocalStack have behavior gaps that cause "works locally, fails in AWS" issues. Most teams use personal dev stages instead.
+
+### Setup
+
+**Prerequisites:** Node.js 20.x, AWS CLI configured
+
+```bash
+# Install layer dependencies
+cd layer/nodejs
+npm install
+cd ../..
+
+# Deploy to your personal dev stage
+serverless deploy --stage dev-yourname
 ```
-┌─────────┐                  ┌─────────┐
-│ Client  │                  │   API   │
-└────┬────┘                  └────┬────┘
-     │                            │
-     │  POST /register            │
-     ├───────────────────────────>│
-     │  {email, password}         │
-     │                            │
-     │  201 Created               │
-     │<───────────────────────────┤
-     │  {userId}                  │
-     │                            │
-     │  POST /login               │
-     ├───────────────────────────>│
-     │  {email, password}         │
-     │                            │
-     │  200 OK                    │
-     │<───────────────────────────┤
-     │  {accessToken,             │
-     │   refreshToken}            │
-     │                            │
-     │  GET /accounts             │
-     ├───────────────────────────>│
-     │  Authorization: Bearer     │
-     │                            │
-     │  200 OK                    │
-     │<───────────────────────────┤
-     │  {accounts: [...]}         │
-     │                            │
-     │  POST /refresh             │
-     ├───────────────────────────>│
-     │  {refreshToken}            │
-     │                            │
-     │  200 OK                    │
-     │<───────────────────────────┤
-     │  {accessToken}             │
-     │                            │
-     │  POST /logout              │
-     ├───────────────────────────>│
-     │  Authorization: Bearer     │
-     │                            │
-     │  200 OK                    │
-     │<───────────────────────────┤
-     │  {message}                 │
-     │                            │
+
+### Testing
+
+Run integration tests against deployed API:
+
+```bash
+node test-api.mjs https://YOUR_API_URL/dev-yourname
+```
+
+**Test coverage (26 tests):**
+- Happy path: Registration, login, account operations, transfers
+- Security: Token validation, ownership checks, expired tokens
+- Validation: Missing fields, invalid amounts, overdrafts
+
+### Debugging
+
+```bash
+# View function logs
+serverless logs -f register --stage dev
+
+# Tail logs in real-time
+serverless logs -f register --stage dev --tail
+```
+
+---
+
+## Deployment
+
+```bash
+# Package (inspect before deploying)
+serverless package --stage dev
+
+# Deploy
+serverless deploy --stage dev
+
+# Deploy to production
+serverless deploy --stage prod
+```
+
+**Important:** Set a strong JWT secret for production:
+
+```bash
+# Generate secure secret
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# Deploy with custom secret
+JWT_SECRET=your-secure-secret serverless deploy --stage prod
 ```
 
 ---
@@ -239,66 +342,20 @@ curl https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts/ACC00
 
 ---
 
-## Local Development
-
-**Prerequisites:** Node.js, Docker, AWS CLI, AWS SAM CLI
-
-**Setup:**
-
-1. Start DynamoDB Local
-```bash
-docker run -p 8000:8000 amazon/dynamodb-local
-```
-
-2. Install dependencies
-```bash
-cd layer/shared
-npm install
-```
-
-3. Build and run
-```bash
-sam build
-sam local start-api --env-vars env.json
-```
-
-4. Test locally at `http://localhost:3000`
-
----
-
-## Deployment
-
-```bash
-# Build
-sam build
-
-# Deploy
-sam deploy --guided
-
-# Follow prompts and set a strong JWT_SECRET
-```
-
-**Important:** Always use a strong JWT secret in production!
-
-Generate one:
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-```
-
----
-
 ## Error Handling
 
 The API returns standard HTTP status codes:
 
-- `200` - Success
-- `201` - Created
-- `400` - Bad Request (invalid input)
-- `401` - Unauthorized (missing/invalid token)
-- `403` - Forbidden (ownership violation)
-- `404` - Not Found
-- `409` - Conflict (duplicate email/account)
-- `500` - Internal Server Error
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request (invalid input) |
+| 401 | Unauthorized (missing/invalid token) |
+| 403 | Forbidden (ownership violation) |
+| 404 | Not Found |
+| 409 | Conflict (duplicate email/account) |
+| 500 | Internal Server Error |
 
 **Example Error Response:**
 ```json
@@ -311,33 +368,10 @@ The API returns standard HTTP status codes:
 
 ## Key Learnings
 
+- **Lambda Layers:** Shared code packaging, `/opt/nodejs/` import paths, layer versioning
+- **Serverless Framework:** Individual packaging, per-function patterns, esbuild configuration
 - **Authentication:** JWT token management, refresh token rotation
 - **Authorization:** Role-based access control, ownership verification
 - **Security:** Password hashing, token expiration, secure API design
 - **DynamoDB:** GSI design for efficient queries, TTL for auto-cleanup
-- **Serverless:** Lambda best practices, shared layers, environment variables
-- **Infrastructure as Code:** AWS SAM templates, CloudFormation
-- **API Design:** RESTful endpoints, proper HTTP semantics
-
----
-
-## Project Evolution
-
-### Phase 1: Core Banking API
-- Basic account operations (create, deposit, withdraw)
-- Transaction tracking
-- DynamoDB integration
-
-### Phase 2: Authentication & Authorization (Current)
-- User registration and login
-- JWT-based authentication
-- Account ownership enforcement
-- Token refresh mechanism
-- Secure multi-user system
-
----
-
-## Author
-
-Youssef Ahmed
-[LinkedIn](https://www.linkedin.com/in/youssef-ahmed-a74509218/)
+- **Testing:** Integration tests against real AWS, corporate dev workflows
