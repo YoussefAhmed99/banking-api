@@ -1,15 +1,21 @@
 service: banking-api
 
-plugins:
-  - serverless-offline
-
-build:
-  esbuild:
-    bundle: true
-    minify: false
-    exclude:
-      - '@aws-sdk/client-dynamodb'
-      - '@aws-sdk/lib-dynamodb'
+package:
+  individually: true
+  patterns:
+    - '!.aws-sam/**'
+    - '!claude md files/**'
+    - '!events/**'
+    - '!.serverless/**'
+    - '!layer/**'
+    - '!node_modules/**'
+    - '!shared'
+    - '!*.mjs'
+    - '!*.md'
+    - '!*.yml'
+    - '!*.json'
+    - '!*.toml'
+    - '!functions/**'
 
 provider:
   name: aws
@@ -50,6 +56,9 @@ provider:
 functions:
   register:
     handler: functions/register/app.handler
+    package:
+      patterns:
+        - 'functions/register/**'
     events:
       - http:
           path: register
@@ -58,6 +67,9 @@ functions:
   
   login:
     handler: functions/login/app.handler
+    package:
+      patterns:
+        - 'functions/login/**'
     events:
       - http:
           path: login
@@ -66,6 +78,9 @@ functions:
   
   refresh:
     handler: functions/refresh/app.handler
+    package:
+      patterns:
+        - 'functions/refresh/**'
     events:
       - http:
           path: refresh
@@ -74,6 +89,9 @@ functions:
   
   logout:
     handler: functions/logout/app.handler
+    package:
+      patterns:
+        - 'functions/logout/**'
     events:
       - http:
           path: logout
@@ -82,6 +100,9 @@ functions:
   
   listAccounts:
     handler: functions/list-accounts/app.handler
+    package:
+      patterns:
+        - 'functions/list-accounts/**'
     events:
       - http:
           path: accounts
@@ -90,6 +111,9 @@ functions:
   
   createAccount:
     handler: functions/create-account/app.handler
+    package:
+      patterns:
+        - 'functions/create-account/**'
     events:
       - http:
           path: accounts
@@ -98,6 +122,9 @@ functions:
   
   getAccount:
     handler: functions/get-account/app.handler
+    package:
+      patterns:
+        - 'functions/get-account/**'
     events:
       - http:
           path: accounts/{accountId}
@@ -106,6 +133,9 @@ functions:
   
   getBalance:
     handler: functions/get-balance/app.handler
+    package:
+      patterns:
+        - 'functions/get-balance/**'
     events:
       - http:
           path: accounts/{accountId}/balance
@@ -114,6 +144,9 @@ functions:
   
   deposit:
     handler: functions/deposit/app.handler
+    package:
+      patterns:
+        - 'functions/deposit/**'
     events:
       - http:
           path: accounts/{accountId}/deposit
@@ -122,6 +155,9 @@ functions:
   
   withdraw:
     handler: functions/withdraw/app.handler
+    package:
+      patterns:
+        - 'functions/withdraw/**'
     events:
       - http:
           path: accounts/{accountId}/withdraw
@@ -130,6 +166,9 @@ functions:
   
   transfer:
     handler: functions/transfer/app.handler
+    package:
+      patterns:
+        - 'functions/transfer/**'
     events:
       - http:
           path: accounts/{accountId}/transfer
@@ -138,6 +177,9 @@ functions:
   
   getTransactions:
     handler: functions/get-transactions/app.handler
+    package:
+      patterns:
+        - 'functions/get-transactions/**'
     events:
       - http:
           path: accounts/{accountId}/transactions

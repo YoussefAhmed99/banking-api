@@ -1,7 +1,11 @@
-import { existsSync } from 'fs';
+const BASE_URL = process.argv[2];
 
-const DEPLOYED_URL = process.argv[2]; // e.g., node test-api.mjs https://xxx.execute-api.eu-north-1.amazonaws.com/dev
-const BASE_URL = DEPLOYED_URL || 'http://localhost:3000/dev';
+if (!BASE_URL) {
+    console.error('\n❌ Usage: node test-api.mjs <API_URL>\n');
+    console.error('   Example:');
+    console.error('     node test-api.mjs https://xxxxx.execute-api.eu-north-1.amazonaws.com/dev\n');
+    process.exit(1);
+}
 
 // Shared context for test data
 const ctx = {
@@ -457,21 +461,20 @@ const testSuite = {
 // ============================================================================
 
 async function checkPrerequisites() {
-    console.log('  🔍 Checking prerequisites...\n');
+    console.log('  🔍 Checking API connectivity...\n');
+    console.log(`  📍 Target: ${BASE_URL}\n`);
 
-    // Check if serverless is running
     try {
         const response = await fetch(BASE_URL + '/register', { method: 'OPTIONS' });
+        console.log(`  ${colors.green}✅ API is reachable${colors.reset}\n`);
     } catch (error) {
-        console.error(`${colors.red}❌ Serverless is not running on http://localhost:3000${colors.reset}\n`);
-        console.error('   Start it with:');
-        console.error('     serverless offline start\n');
+        console.error(`${colors.red}❌ Cannot reach API at ${BASE_URL}${colors.reset}\n`);
+        console.error('   Check that:');
+        console.error('     1. The URL is correct');
+        console.error('     2. The API is deployed (serverless deploy --stage dev)');
+        console.error('     3. You have internet connectivity\n');
         process.exit(1);
     }
-
-    // Check if DynamoDB Local is accessible (via setup-local validation)
-    console.log(`  ${colors.green}✅ API server is running${colors.reset}`);
-    console.log(`  ${colors.gray}ℹ️  Assuming setup-local.mjs was run (tables exist)${colors.reset}\n`);
 }
 
 // ============================================================================

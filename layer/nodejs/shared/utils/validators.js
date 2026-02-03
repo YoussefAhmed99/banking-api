@@ -1,4 +1,4 @@
-import { ValidationError } from '../../shared/errors/AppError.js'
+import { ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
 
 export function validateEmail(email) {
     if (!email || typeof email !== 'string') {

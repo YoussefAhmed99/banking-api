@@ -1,8 +1,8 @@
 import { ScanCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
-import { docClient } from '../../shared/db/client.js'
-import { success, error } from '../../shared/utils/responses.js'
-import { logger } from '../../shared/logger/index.js'
-import { verifyAccessToken } from '../../shared/auth/auth.js'
+import { docClient } from '/opt/nodejs/shared/db/client.js'
+import { success, error } from '/opt/nodejs/shared/utils/responses.js'
+import { logger } from '/opt/nodejs/shared/logger/index.js'
+import { verifyAccessToken } from '/opt/nodejs/shared/auth/auth.js'
 
 export const handler = async event => {
   try {
