@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "/opt/nodejs/*": ["layer/nodejs/*"]
+    }
+  },
+  "include": ["functions/**/*", "layer/**/*"],
+  "exclude": ["node_modules", ".serverless"]
+}
