@@ -161,30 +161,21 @@ node test-api.mjs https://your-api-url.execute-api.region.amazonaws.com/dev
 
 ---
 
-## Security Features
+This project follows corporate-standard serverless development practices: **deploy to AWS for testing** rather than local emulation.
 
-✅ **Password Security**
-- Bcrypt hashing with 10 salt rounds
-- Passwords never stored in plaintext
-- Email validation and password strength requirements
+### Why Not Local Emulation?
 
-✅ **Token Security**
-- Short-lived access tokens (15 minutes)
-- Longer refresh tokens (1 hour) stored separately
-- Token type validation (can't use refresh token for API access)
-- Automatic token cleanup via DynamoDB TTL
+Tools like `serverless-offline` and LocalStack have behavior gaps that cause "works locally, fails in AWS" issues. Most teams use personal dev stages instead.
 
-✅ **Authorization**
-- JWT verification on all protected endpoints
-- Account ownership checks prevent cross-user access
-- Proper HTTP status codes (401 Unauthorized, 403 Forbidden)
+### Setup
 
-✅ **Data Protection**
-- Users can only access their own accounts
-- Ownership verified on every operation
-- Proper error handling prevents information leakage
+**Prerequisites:** Node.js 20.x, AWS CLI configured
 
----
+```bash
+# Install layer dependencies
+cd layer/nodejs
+npm install
+cd ../..
 
 ## Error Handling
 
