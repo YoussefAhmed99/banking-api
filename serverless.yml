@@ -16,6 +16,7 @@ package:
     - '!*.json'
     - '!*.toml'
     - '!functions/**'
+    - 'package.json'
 
 provider:
   name: aws
@@ -55,10 +56,11 @@ provider:
 
 functions:
   register:
-    handler: functions/register/app.handler
+    handler: dist/functions/register/app.handler
     package:
       patterns:
-        - 'functions/register/**'
+        - '!dist/functions/**'
+        - 'dist/functions/register/**'
     events:
       - http:
           path: register
@@ -66,10 +68,11 @@ functions:
           cors: true
   
   login:
-    handler: functions/login/app.handler
+    handler: dist/functions/login/app.handler
     package:
       patterns:
-        - 'functions/login/**'
+        - '!dist/functions/**'
+        - 'dist/functions/login/**'
     events:
       - http:
           path: login
@@ -77,10 +80,11 @@ functions:
           cors: true
   
   refresh:
-    handler: functions/refresh/app.handler
+    handler: dist/functions/refresh/app.handler
     package:
       patterns:
-        - 'functions/refresh/**'
+        - '!dist/functions/**'
+        - 'dist/functions/refresh/**'
     events:
       - http:
           path: refresh
@@ -88,10 +92,11 @@ functions:
           cors: true
   
   logout:
-    handler: functions/logout/app.handler
+    handler: dist/functions/logout/app.handler
     package:
       patterns:
-        - 'functions/logout/**'
+        - '!dist/functions/**'
+        - 'dist/functions/logout/**'
     events:
       - http:
           path: logout
@@ -99,10 +104,11 @@ functions:
           cors: true
   
   listAccounts:
-    handler: functions/list-accounts/app.handler
+    handler: dist/functions/list-accounts/app.handler
     package:
       patterns:
-        - 'functions/list-accounts/**'
+        - '!dist/functions/**'
+        - 'dist/functions/list-accounts/**'
     events:
       - http:
           path: accounts
@@ -110,10 +116,11 @@ functions:
           cors: true
   
   createAccount:
-    handler: functions/create-account/app.handler
+    handler: dist/functions/create-account/app.handler
     package:
       patterns:
-        - 'functions/create-account/**'
+        - '!dist/functions/**'
+        - 'dist/functions/create-account/**'
     events:
       - http:
           path: accounts
@@ -121,10 +128,11 @@ functions:
           cors: true
   
   getAccount:
-    handler: functions/get-account/app.handler
+    handler: dist/functions/get-account/app.handler
     package:
       patterns:
-        - 'functions/get-account/**'
+        - '!dist/functions/**'
+        - 'dist/functions/get-account/**'
     events:
       - http:
           path: accounts/{accountId}
@@ -132,10 +140,11 @@ functions:
           cors: true
   
   getBalance:
-    handler: functions/get-balance/app.handler
+    handler: dist/functions/get-balance/app.handler
     package:
       patterns:
-        - 'functions/get-balance/**'
+        - '!dist/functions/**'
+        - 'dist/functions/get-balance/**'
     events:
       - http:
           path: accounts/{accountId}/balance
@@ -143,10 +152,11 @@ functions:
           cors: true
   
   deposit:
-    handler: functions/deposit/app.handler
+    handler: dist/functions/deposit/app.handler
     package:
       patterns:
-        - 'functions/deposit/**'
+        - '!dist/functions/**'
+        - 'dist/functions/deposit/**'
     events:
       - http:
           path: accounts/{accountId}/deposit
@@ -154,10 +164,11 @@ functions:
           cors: true
   
   withdraw:
-    handler: functions/withdraw/app.handler
+    handler: dist/functions/withdraw/app.handler
     package:
       patterns:
-        - 'functions/withdraw/**'
+        - '!dist/functions/**'
+        - 'dist/functions/withdraw/**'
     events:
       - http:
           path: accounts/{accountId}/withdraw
@@ -165,10 +176,11 @@ functions:
           cors: true
   
   transfer:
-    handler: functions/transfer/app.handler
+    handler: dist/functions/transfer/app.handler
     package:
       patterns:
-        - 'functions/transfer/**'
+        - '!dist/functions/**'
+        - 'dist/functions/transfer/**'
     events:
       - http:
           path: accounts/{accountId}/transfer
@@ -176,10 +188,11 @@ functions:
           cors: true
   
   getTransactions:
-    handler: functions/get-transactions/app.handler
+    handler: dist/functions/get-transactions/app.handler
     package:
       patterns:
-        - 'functions/get-transactions/**'
+        - '!dist/functions/**'
+        - 'dist/functions/get-transactions/**'
     events:
       - http:
           path: accounts/{accountId}/transactions
@@ -188,7 +201,7 @@ functions:
 
 layers:
   shared:
-    path: layer
+    path: dist/layer
     name: ${self:service}-shared-${self:provider.stage}
     description: Shared utilities for banking API
     compatibleRuntimes:

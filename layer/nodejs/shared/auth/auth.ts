@@ -1,8 +1,9 @@
-import { verifyToken } from './jwt.js'
+import { APIGatewayProxyEvent } from 'aws-lambda'
+import { verifyToken, TokenPayload } from './jwt.js'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { UnauthorizedError, ForbiddenError } from '../errors/AppError.js'
 
-export function extractTokenFromHeader(event) {
+export function extractTokenFromHeader(event: APIGatewayProxyEvent ) : string {
     const authHeader = event.headers?.Authorization || event.headers?.authorization
     if (!authHeader) {
         throw new UnauthorizedError('Missing Authorization header')
@@ -16,7 +17,7 @@ export function extractTokenFromHeader(event) {
     return parts[1]
 }
 
-export function verifyAccessToken(event) {
+export function verifyAccessToken(event: APIGatewayProxyEvent): TokenPayload {
     const token = extractTokenFromHeader(event)
 
     try {
@@ -28,17 +29,19 @@ export function verifyAccessToken(event) {
 
         return decoded
     } catch (err) {
-        if (err.name === 'TokenExpiredError') {
-            throw new UnauthorizedError('Token has expired')
-        }
-        if (err.name === 'JsonWebTokenError') {
-            throw new UnauthorizedError('Invalid token')
+        if(err instanceof Error) {
+            if (err.name === 'TokenExpiredError') {
+                throw new UnauthorizedError('Token has expired')
+            }
+            if (err.name === 'JsonWebTokenError') {
+                throw new UnauthorizedError('Invalid token')
+            }
         }
         throw err
     }
 }
 
-export async function checkAccountOwnership(accountId, userId, docClient) {
+export async function checkAccountOwnership(accountId: string, userId: string, docClient: any) {
     const result = await docClient.send(new GetCommand({
         TableName: process.env.ACCOUNTS_TABLE,
         Key: { accountId }

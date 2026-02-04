@@ -1,17 +1,21 @@
 import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { docClient } from '/opt/nodejs/shared/db/client.js'
-import { ConflictError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
+import { AppError, ConflictError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
 import { validateAccountId, validateAmount } from '/opt/nodejs/shared/utils/validators.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
 import { logger } from '/opt/nodejs/shared/logger/index.js'
 import { verifyAccessToken } from '/opt/nodejs/shared/auth/auth.js'
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
-export const handler = async event => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
     // Verify JWT and extract userId
     const decoded = verifyAccessToken(event)
     const { userId } = decoded
 
+    if(!event.body) {
+      throw new ValidationError('Request body is required')
+    }
     const body = JSON.parse(event.body)
     const { accountId, customerName, initialBalance } = body
 
@@ -71,9 +75,14 @@ export const handler = async event => {
     logger.info('Account created successfully', { accountId })
     return success({ message: 'Account created successfully', account }, 201)
   } catch (err) {
-    if (err.isOperational) {
+    if (err instanceof AppError) {
       logger.info('Operational error', { error: err.message })
       return error(err.message, err.statusCode)
+    }
+
+    if(err instanceof Error) {
+      logger.error('Unexpected error', err);
+      return error('Internal server error', 500);
     }
 
     logger.error('Unexpected error creating account', err)

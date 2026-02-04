@@ -8,10 +8,12 @@ if (!BASE_URL) {
 }
 
 // Shared context for test data
+const testId = Date.now()
+
 const ctx = {
-    user1: { email: 'user1@test.com', password: 'password123', token: null, refreshToken: null, userId: null },
-    user2: { email: 'user2@test.com', password: 'password456', token: null, refreshToken: null, userId: null },
-    accounts: { acc1: 'ACC001', acc2: 'ACC002', acc3: 'ACC003' }
+    user1: { email: `user1-${testId}@test.com`, password: 'password123', token: null, refreshToken: null, userId: null },
+    user2: { email: `user2-${testId}@test.com`, password: 'password456', token: null, refreshToken: null, userId: null },
+    accounts: { acc1: `ACC001-${testId}`, acc2: `ACC002-${testId}`, acc3: `ACC003-${testId}` }
 };
 
 // Colors for output
