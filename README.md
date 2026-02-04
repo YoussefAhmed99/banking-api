@@ -1,12 +1,12 @@
 # Banking Transaction API
 
-A secure serverless REST API for managing bank accounts and transactions with JWT authentication, built with AWS Lambda, DynamoDB, and API Gateway.
+A secure serverless REST API for managing bank accounts and transactions with JWT authentication, built with AWS Lambda, DynamoDB, API Gateway, and TypeScript.
 
 ## Overview
 
 This project demonstrates serverless architecture, banking logic, and security best practices using AWS services. Features user authentication, account ownership verification, deposits, withdrawals, transfers, and complete transaction audit trail.
 
-**Live API:** `https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/`
+**Live API:** `https://o7jgcnqqnl.execute-api.eu-north-1.amazonaws.com/dev/`
 
 ---
 
@@ -34,13 +34,53 @@ This project demonstrates serverless architecture, banking logic, and security b
 
 ## Tech Stack
 
-- **AWS Lambda** - Serverless compute (Node.js 24.x)
+- **AWS Lambda** - Serverless compute (Node.js 20.x)
 - **Amazon DynamoDB** - NoSQL database with GSIs
-- **API Gateway** - HTTP API endpoints
-- **AWS SAM** - Infrastructure as Code
+- **API Gateway** - REST API endpoints
+- **Serverless Framework v4** - Infrastructure as Code
+- **TypeScript** - Type-safe codebase
+- **Lambda Layers** - Shared utilities across functions
 - **JWT** - Token-based authentication
 - **bcrypt** - Password hashing
-- **Docker** - Local development (DynamoDB Local)
+
+---
+
+## Project Structure
+```
+banking-api/
+├── functions/                 # Lambda function handlers (TypeScript)
+│   ├── register/app.ts
+│   ├── login/app.ts
+│   ├── refresh/app.ts
+│   ├── logout/app.ts
+│   ├── create-account/app.ts
+│   ├── get-account/app.ts
+│   ├── get-balance/app.ts
+│   ├── list-accounts/app.ts
+│   ├── deposit/app.ts
+│   ├── withdraw/app.ts
+│   ├── transfer/app.ts
+│   └── get-transactions/app.ts
+├── layer/nodejs/shared/       # Lambda Layer (shared utilities)
+│   ├── auth/
+│   │   ├── auth.ts            # Token verification, ownership checks
+│   │   ├── jwt.ts             # JWT generation/verification
+│   │   └── password.ts        # bcrypt hashing
+│   ├── db/
+│   │   └── client.ts          # DynamoDB client
+│   ├── errors/
+│   │   └── AppError.ts        # Custom error classes
+│   ├── logger/
+│   │   └── index.ts           # Structured JSON logging
+│   └── utils/
+│       ├── responses.ts       # HTTP response helpers
+│       └── validators.ts      # Input validation
+├── dist/                      # Compiled output (gitignored)
+├── serverless.yml             # Serverless Framework config
+├── tsconfig.json              # TypeScript config
+├── package.json               # Dependencies & build scripts
+└── test-api.mjs               # Integration test suite
+```
 
 ---
 
@@ -92,125 +132,32 @@ GET    /accounts/{id}/transactions            Get transaction history (owner onl
 
 ---
 
-## Quick Start
+## Build & Deployment
 
-### 1. Register a User
+### Prerequisites
+- Node.js 20+
+- AWS CLI configured
+- Serverless Framework v4
+
+### Build
 ```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "SecurePass123!"
-  }'
+npm install
+npm run build
 ```
 
-### 2. Login
+This compiles TypeScript to `dist/` and copies layer dependencies.
+
+### Deploy
 ```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "SecurePass123!"
-  }'
+serverless deploy --stage dev
 ```
 
-**Response:**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": 900
-}
-```
-
-### 3. Create Account
+### Run Tests
 ```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "accountId": "ACC001",
-    "customerName": "John Doe",
-    "initialBalance": 1000
-  }'
+node test-api.mjs https://your-api-url.execute-api.region.amazonaws.com/dev
 ```
 
-### 4. Deposit Funds
-```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts/ACC001/deposit \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{"amount": 500}'
-```
-
-### 5. Transfer Funds
-```bash
-curl -X POST https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts/ACC001/transfer \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "toAccountId": "ACC002",
-    "amount": 200
-  }'
-```
-
-### 6. Get Transactions
-```bash
-curl https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts/ACC001/transactions \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
----
-
-## Authentication Flow
-
-```
-┌─────────┐                  ┌─────────┐
-│ Client  │                  │   API   │
-└────┬────┘                  └────┬────┘
-     │                            │
-     │  POST /register            │
-     ├───────────────────────────>│
-     │  {email, password}         │
-     │                            │
-     │  201 Created               │
-     │<───────────────────────────┤
-     │  {userId}                  │
-     │                            │
-     │  POST /login               │
-     ├───────────────────────────>│
-     │  {email, password}         │
-     │                            │
-     │  200 OK                    │
-     │<───────────────────────────┤
-     │  {accessToken,             │
-     │   refreshToken}            │
-     │                            │
-     │  GET /accounts             │
-     ├───────────────────────────>│
-     │  Authorization: Bearer     │
-     │                            │
-     │  200 OK                    │
-     │<───────────────────────────┤
-     │  {accounts: [...]}         │
-     │                            │
-     │  POST /refresh             │
-     ├───────────────────────────>│
-     │  {refreshToken}            │
-     │                            │
-     │  200 OK                    │
-     │<───────────────────────────┤
-     │  {accessToken}             │
-     │                            │
-     │  POST /logout              │
-     ├───────────────────────────>│
-     │  Authorization: Bearer     │
-     │                            │
-     │  200 OK                    │
-     │<───────────────────────────┤
-     │  {message}                 │
-     │                            │
-```
+26 integration tests covering happy path, security, and validation scenarios.
 
 ---
 
@@ -239,66 +186,20 @@ curl https://s8rcq88bub.execute-api.eu-north-1.amazonaws.com/Prod/accounts/ACC00
 
 ---
 
-## Local Development
-
-**Prerequisites:** Node.js, Docker, AWS CLI, AWS SAM CLI
-
-**Setup:**
-
-1. Start DynamoDB Local
-```bash
-docker run -p 8000:8000 amazon/dynamodb-local
-```
-
-2. Install dependencies
-```bash
-cd layer/shared
-npm install
-```
-
-3. Build and run
-```bash
-sam build
-sam local start-api --env-vars env.json
-```
-
-4. Test locally at `http://localhost:3000`
-
----
-
-## Deployment
-
-```bash
-# Build
-sam build
-
-# Deploy
-sam deploy --guided
-
-# Follow prompts and set a strong JWT_SECRET
-```
-
-**Important:** Always use a strong JWT secret in production!
-
-Generate one:
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-```
-
----
-
 ## Error Handling
 
 The API returns standard HTTP status codes:
 
-- `200` - Success
-- `201` - Created
-- `400` - Bad Request (invalid input)
-- `401` - Unauthorized (missing/invalid token)
-- `403` - Forbidden (ownership violation)
-- `404` - Not Found
-- `409` - Conflict (duplicate email/account)
-- `500` - Internal Server Error
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request (invalid input) |
+| 401 | Unauthorized (missing/invalid token) |
+| 403 | Forbidden (ownership violation) |
+| 404 | Not Found |
+| 409 | Conflict (duplicate email/account) |
+| 500 | Internal Server Error |
 
 **Example Error Response:**
 ```json
@@ -309,18 +210,6 @@ The API returns standard HTTP status codes:
 
 ---
 
-## Key Learnings
-
-- **Authentication:** JWT token management, refresh token rotation
-- **Authorization:** Role-based access control, ownership verification
-- **Security:** Password hashing, token expiration, secure API design
-- **DynamoDB:** GSI design for efficient queries, TTL for auto-cleanup
-- **Serverless:** Lambda best practices, shared layers, environment variables
-- **Infrastructure as Code:** AWS SAM templates, CloudFormation
-- **API Design:** RESTful endpoints, proper HTTP semantics
-
----
-
 ## Project Evolution
 
 ### Phase 1: Core Banking API
@@ -328,16 +217,20 @@ The API returns standard HTTP status codes:
 - Transaction tracking
 - DynamoDB integration
 
-### Phase 2: Authentication & Authorization (Current)
+### Phase 2: Authentication & Authorization
 - User registration and login
 - JWT-based authentication
 - Account ownership enforcement
 - Token refresh mechanism
-- Secure multi-user system
+
+### Phase 3: Production Infrastructure
+- Migrated from AWS SAM to Serverless Framework v4
+- Lambda Layers for shared utilities
+- TypeScript migration for type safety
+- Integration test suite
 
 ---
 
 ## Author
 
 Youssef Ahmed
-[LinkedIn](https://www.linkedin.com/in/youssef-ahmed-a74509218/)
