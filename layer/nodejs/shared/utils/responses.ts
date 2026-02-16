@@ -5,9 +5,9 @@ export function success(data: unknown, statusCode: number = 200) {
     }
 }
 
-export function error(message: string, statusCode: number = 500) {
-    return {
-        statusCode,
-        body: JSON.stringify({ error: message })
-    }
+export function error(message: string, statusCode = 500, extra = {}) {
+  return {
+    statusCode,
+    body: JSON.stringify({ error: message, ...extra })
+  }
 }
