@@ -1,19 +1,22 @@
 import { docClient } from '/opt/nodejs/shared/db/client.js'
-import { AppError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
+import { AppError } from '/opt/nodejs/shared/errors/AppError.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
 import { logger } from '/opt/nodejs/shared/logger/index.js'
 import { verifyAccessToken, checkAccountOwnership } from '/opt/nodejs/shared/auth/auth.js'
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import middy from '/opt/nodejs/node_modules/@middy/core/index.js'
+import { validationMiddleware } from '/opt/nodejs/shared/middleware/validation.js'
+import { accountIdSchema, AccountIdPathParam } from '/opt/nodejs/shared/schemas/index.js'
 
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+type GetAccountEvent = APIGatewayProxyEvent & {
+  validatedParams: AccountIdPathParam
+}
+
+const baseHandler = async (event: GetAccountEvent): Promise<APIGatewayProxyResult> => {
   try {
     const decoded = verifyAccessToken(event)
     const { userId } = decoded
-    const accountId = event.pathParameters?.accountId
-
-    if (!accountId) {
-      throw new ValidationError('Account ID is required')
-    }
+    const { accountId } = event.validatedParams
 
     logger.info('Getting account', { accountId, userId })
 
@@ -37,3 +40,9 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return error('Internal server error', 500)
   }
 }
+
+export const handler = middy(baseHandler).use(
+  validationMiddleware({
+    pathParameters: accountIdSchema
+  })
+)

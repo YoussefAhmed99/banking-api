@@ -1,29 +1,26 @@
 import { PutCommand } from '@aws-sdk/lib-dynamodb'
 import { docClient } from '/opt/nodejs/shared/db/client.js'
 import { AppError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
-import { validateAmount } from '/opt/nodejs/shared/utils/validators.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
 import { logger } from '/opt/nodejs/shared/logger/index.js'
 import { verifyAccessToken, checkAccountOwnership } from '/opt/nodejs/shared/auth/auth.js'
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import middy from '/opt/nodejs/node_modules/@middy/core/index.js'
+import { validationMiddleware } from '/opt/nodejs/shared/middleware/validation.js'
+import { withdrawSchema, accountIdSchema, WithdrawBody, AccountIdPathParam } from '/opt/nodejs/shared/schemas/index.js'
 
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+type WithdrawEvent = APIGatewayProxyEvent & {
+  validatedBody: WithdrawBody
+  validatedParams: AccountIdPathParam
+}
+
+const baseHandler = async (event: WithdrawEvent): Promise<APIGatewayProxyResult> => {
   try {
     const decoded = verifyAccessToken(event)
     const { userId } = decoded
 
-    if (!event.body) {
-      throw new ValidationError('Request body is required')
-    }
-    const body = JSON.parse(event.body)
-    const accountId = event.pathParameters?.accountId
-    const { amount } = body
-
-    if (!accountId) {
-      throw new ValidationError('Account ID is required')
-    }
-
-    validateAmount(amount)
+    const { accountId } = event.validatedParams
+    const { amount } = event.validatedBody
 
     logger.info('Processing withdrawal', { accountId, amount, userId })
 
@@ -77,3 +74,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return error('Internal server error', 500)
   }
 }
+
+export const handler = middy(baseHandler).use(
+  validationMiddleware({
+    body: withdrawSchema,
+    pathParameters: accountIdSchema
+  })
+)

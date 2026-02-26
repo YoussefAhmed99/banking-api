@@ -6,19 +6,20 @@ import { logger } from '/opt/nodejs/shared/logger/index.js'
 import { verifyAccessToken, checkAccountOwnership } from '/opt/nodejs/shared/auth/auth.js'
 import middy from '/opt/nodejs/node_modules/@middy/core/index.js'
 import { validationMiddleware } from '/opt/nodejs/shared/middleware/validation.js'
-import { depositSchema } from '/opt/nodejs/shared/schemas/index.js'
+import { accountIdSchema , depositSchema, DepositBody, AccountIdPathParam } from '/opt/nodejs/shared/schemas/index.js'
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
 
-const baseHandler = async (event: APIGatewayProxyEvent & { validatedBody?: any }): Promise<APIGatewayProxyResult> => {
+type DepositEvent = APIGatewayProxyEvent & {
+  validatedBody: DepositBody
+  validatedParams: AccountIdPathParam
+}
+
+const baseHandler = async (event: DepositEvent): Promise<APIGatewayProxyResult> => {
   try {
     const decoded = verifyAccessToken(event)
     const { userId } = decoded
-    const accountId = event.pathParameters?.accountId
+    const { accountId } = event.validatedParams
     const { amount } = event.validatedBody
-
-    if (!accountId) {
-      return error('Account ID is required', 400)
-    }
 
     logger.info('Processing deposit', { accountId, amount, userId })
 
@@ -66,4 +67,9 @@ const baseHandler = async (event: APIGatewayProxyEvent & { validatedBody?: any }
   }
 }
 
-export const handler = middy(baseHandler).use(validationMiddleware(depositSchema))
+export const handler = middy(baseHandler).use(
+  validationMiddleware({
+    body: depositSchema,
+    pathParameters: accountIdSchema 
+  })
+)
