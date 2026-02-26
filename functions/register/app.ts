@@ -1,23 +1,22 @@
 import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { docClient } from '/opt/nodejs/shared/db/client.js'
-import { AppError, ConflictError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
-import { validateEmail, validatePassword } from '/opt/nodejs/shared/utils/validators.js'
+import { AppError, ConflictError } from '/opt/nodejs/shared/errors/AppError.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
 import { logger } from '/opt/nodejs/shared/logger/index.js'
 import { hashPassword } from '/opt/nodejs/shared/auth/password.js'
 import crypto from 'crypto'
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import middy from '/opt/nodejs/node_modules/@middy/core/index.js'
+import { validationMiddleware } from '/opt/nodejs/shared/middleware/validation.js'
+import { registerSchema, RegisterBody } from '/opt/nodejs/shared/schemas/index.js'
 
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+type RegisterEvent = APIGatewayProxyEvent & {
+  validatedBody: RegisterBody
+}
+
+const baseHandler = async (event: RegisterEvent): Promise<APIGatewayProxyResult> => {
   try {
-    if (!event.body) {
-      throw new ValidationError('Request body is required')
-    }
-    const body = JSON.parse(event.body)
-    const { email, password } = body
-
-    validateEmail(email)
-    validatePassword(password)
+    const { email, password } = event.validatedBody
 
     logger.info('Registering user', { email })
 
@@ -72,3 +71,9 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return error('Internal server error', 500)
   }
 }
+
+export const handler = middy(baseHandler).use(
+  validationMiddleware({
+    body: registerSchema
+  })
+)

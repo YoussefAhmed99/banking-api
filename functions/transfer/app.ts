@@ -1,30 +1,26 @@
 import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { docClient } from '/opt/nodejs/shared/db/client.js'
 import { AppError, ValidationError, NotFoundError } from '/opt/nodejs/shared/errors/AppError.js'
-import { validateAmount, validateAccountId } from '/opt/nodejs/shared/utils/validators.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
 import { logger } from '/opt/nodejs/shared/logger/index.js'
 import { verifyAccessToken, checkAccountOwnership } from '/opt/nodejs/shared/auth/auth.js'
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import middy from '/opt/nodejs/node_modules/@middy/core/index.js'
+import { validationMiddleware } from '/opt/nodejs/shared/middleware/validation.js'
+import { transferSchema, accountIdSchema, TransferBody, AccountIdPathParam } from '/opt/nodejs/shared/schemas/index.js'
 
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+type TransferEvent = APIGatewayProxyEvent & {
+  validatedBody: TransferBody
+  validatedParams: AccountIdPathParam
+}
+
+const baseHandler = async (event: TransferEvent): Promise<APIGatewayProxyResult> => {
   try {
     const decoded = verifyAccessToken(event)
     const { userId } = decoded
-    if (!event.body) {
-      throw new ValidationError('Request body is required')
-    }
 
-    const body = JSON.parse(event.body)
-    const accountId = event.pathParameters?.accountId
-    const { toAccountId, amount } = body
-
-    if (!accountId) {
-      throw new ValidationError('Account ID is required')
-    }
-
-    validateAccountId(toAccountId)
-    validateAmount(amount)
+    const { accountId } = event.validatedParams
+    const { toAccountId, amount } = event.validatedBody
 
     if (accountId === toAccountId) {
       throw new ValidationError('Cannot transfer to the same account')
@@ -130,3 +126,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return error('Internal server error', 500)
   }
 }
+
+export const handler = middy(baseHandler).use(
+  validationMiddleware({
+    body: transferSchema,
+    pathParameters: accountIdSchema
+  })
+)

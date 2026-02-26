@@ -1,23 +1,21 @@
 import { GetCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { docClient } from '/opt/nodejs/shared/db/client.js'
-import { AppError, UnauthorizedError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
+import { AppError, UnauthorizedError } from '/opt/nodejs/shared/errors/AppError.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
 import { logger } from '/opt/nodejs/shared/logger/index.js'
 import { verifyToken, generateAccessToken } from '/opt/nodejs/shared/auth/jwt.js'
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import middy from '/opt/nodejs/node_modules/@middy/core/index.js'
+import { validationMiddleware } from '/opt/nodejs/shared/middleware/validation.js'
+import { refreshTokenSchema, RefreshTokenBody } from '/opt/nodejs/shared/schemas/index.js'
 
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+type RefreshEvent = APIGatewayProxyEvent & {
+  validatedBody: RefreshTokenBody
+}
+
+const baseHandler = async (event: RefreshEvent): Promise<APIGatewayProxyResult> => {
   try {
-    if (!event.body) {
-      throw new ValidationError('Request body is required')
-    }
-
-    const body = JSON.parse(event.body)
-    const { refreshToken } = body
-
-    if (!refreshToken) {
-      throw new ValidationError('Refresh token is required')
-    }
+    const { refreshToken } = event.validatedBody
 
     logger.info('Refresh token request')
 
@@ -94,3 +92,9 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return error('Internal server error', 500)
   }
 }
+
+export const handler = middy(baseHandler).use(
+  validationMiddleware({
+    body: refreshTokenSchema
+  })
+)

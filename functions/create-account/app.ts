@@ -1,32 +1,25 @@
 import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { docClient } from '/opt/nodejs/shared/db/client.js'
-import { AppError, ConflictError, ValidationError } from '/opt/nodejs/shared/errors/AppError.js'
-import { validateAccountId, validateAmount } from '/opt/nodejs/shared/utils/validators.js'
+import { AppError, ConflictError } from '/opt/nodejs/shared/errors/AppError.js'
 import { success, error } from '/opt/nodejs/shared/utils/responses.js'
 import { logger } from '/opt/nodejs/shared/logger/index.js'
 import { verifyAccessToken } from '/opt/nodejs/shared/auth/auth.js'
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { createAccountSchema, CreateAccountBody } from '/opt/nodejs/shared/schemas/index.js'
+import middy from '/opt/nodejs/node_modules/@middy/core/index.js'
+import { validationMiddleware } from '/opt/nodejs/shared/middleware/validation.js'
 
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+type createAccountEvent = APIGatewayProxyEvent & {
+  validatedBody: CreateAccountBody
+}
+
+const baseHandler = async (event: createAccountEvent): Promise<APIGatewayProxyResult> => {
   try {
     // Verify JWT and extract userId
     const decoded = verifyAccessToken(event)
     const { userId } = decoded
 
-    if(!event.body) {
-      throw new ValidationError('Request body is required')
-    }
-    const body = JSON.parse(event.body)
-    const { accountId, customerName, initialBalance } = body
-
-    // Validate inputs
-    validateAccountId(accountId)
-
-    if (!customerName || typeof customerName !== 'string' || customerName.trim() === '') {
-      throw new ValidationError('Customer name is required')
-    }
-
-    validateAmount(initialBalance, { allowZero: true, fieldName: 'Initial balance' })
+    const { accountId, customerName, initialBalance } = event.validatedBody
 
     logger.info('Creating account', { accountId, customerName, initialBalance, userId })
 
@@ -89,3 +82,9 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return error('Internal server error', 500)
   }
 }
+
+export const handler = middy(baseHandler).use(
+  validationMiddleware({
+    body: createAccountSchema,
+  })
+)
